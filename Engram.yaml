@@ -1,0 +1,89 @@
+apiVersion: catalog.bubustack.io/v1alpha1
+kind: EngramTemplate
+metadata:
+  name: livekit-turn-detector
+  annotations:
+    registry.bubustack.io/maturity: experimental
+spec:
+  version: 0.1.0
+  description: "Buffers LiveKit PCM packets, performs WebRTC VAD, and emits speech.vad.active turn payloads."
+  image: ghcr.io/bubustack/livekit-turn-detector-engram:0.1.0
+  supportedModes:
+    - deployment
+    - job
+  configSchema:
+    type: object
+    properties:
+      frameDurationMs:
+        type: integer
+        default: 20
+        description: Frame size (in milliseconds) used when feeding audio into the VAD.
+      silenceDurationMs:
+        type: integer
+        default: 400
+        description: Minimum trailing silence required to close a turn.
+      minDurationMs:
+        type: integer
+        default: 200
+        description: Minimum speech duration before a turn is emitted.
+      maxDurationMs:
+        type: integer
+        default: 10000
+        description: Hard cap on a single turn; useful to avoid indefinite buffers.
+      aggressiveness:
+        type: integer
+        default: 2
+        minimum: 0
+        maximum: 3
+        description: WebRTC VAD aggressiveness (0 = relaxed, 3 = most strict).
+      outputEncoding:
+        type: string
+        enum: [wav, pcm]
+        default: wav
+        description: Format used for emitted audio turns.
+  inputSchema:
+    type: object
+    properties:
+      type:
+        const: speech.audio.v1
+      room:
+        type: object
+      participant:
+        type: object
+        properties:
+          identity: { type: string }
+          sid: { type: string }
+      audio:
+        type: object
+        properties:
+          encoding: { type: string }
+          sampleRate: { type: integer }
+          channels: { type: integer }
+          data: { type: string, description: Base64-encoded PCM16 chunk }
+  outputSchema:
+    type: object
+    properties:
+      type:
+        const: speech.vad.active
+      room:
+        type: object
+      participant:
+        type: object
+      sequence:
+        type: integer
+      durationMs:
+        type: integer
+      audio:
+        type: object
+        properties:
+          encoding: { type: string }
+          sampleRate: { type: integer }
+          channels: { type: integer }
+          data: { type: string, description: Base64-encoded buffered audio }
+  execution:
+    service:
+      ports:
+        - name: grpc
+          protocol: TCP
+          port: 50051
+          targetPort: 50051
